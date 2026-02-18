@@ -2,6 +2,8 @@
 
 AlloClass est un moteur de classification de tickets clients par LLM, contenant entre autre une boucle d'amelioration iterative et une interface conversationnelle.
 
+<img width="1712" height="992" alt="Capture d’écran 2026-02-18 à 22 48 14" src="https://github.com/user-attachments/assets/03de3b49-5fd8-465f-a997-a74a4e405941" />
+
 ## Démarrage en 2 minutes :
 
 Prerequis : Docker & une clé API OpenAI
