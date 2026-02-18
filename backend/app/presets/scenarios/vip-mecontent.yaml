@@ -1,0 +1,35 @@
+id: vip-mecontent
+name: "Client VIP mecontent"
+description: "Clients importants avec un historique, ton ferme et exigeant"
+icon: crown
+strategy: blind
+difficulty_bias: hard
+
+persona_weights:
+  "Client fidele depuis 3 ans, ton direct mais poli": 0.30
+  "Nouveau client, premiere commande, un peu perdu": 0.00
+  "Client presse, ecrit depuis son telephone, style SMS": 0.05
+  "Client methodique, decrit les faits sans emotion": 0.10
+  "Client age, ton formel et detaille, un peu maladroit avec la technologie": 0.00
+  "Client passif-agressif, politesse froide, sous-entendus": 0.25
+  "Client en colere, majuscules, ponctuation excessive": 0.10
+  "Client decu mais comprehensif, ton triste plutot que vindicatif": 0.05
+  "Client professionnel (achat B2B), ton corporate et factuel": 0.15
+  "Client humoriste, dedramatise avec des blagues malgre le probleme": 0.00
+
+style_weights:
+  "formel et structure": 0.30
+  "familier et decontracte": 0.05
+  "style SMS, abreviations": 0.00
+  "poli mais ferme": 0.35
+  "agressif et impatient": 0.10
+  "detaille et methodique": 0.15
+  "laconique, phrases courtes": 0.05
+
+situation_overrides:
+  - "Client depuis 5 ans, 3eme probleme en 2 mois, envisage d'aller chez un concurrent"
+  - "Commande de plus de 500 euros, livraison premium payee mais en retard"
+  - "Avait un code fidelite, il n'a pas ete applique et personne ne repond"
+  - "A deja contacte le support 2 fois sans resolution, demande un responsable"
+  - "Client B2B avec contrat annuel, qualite en baisse, remet en question le partenariat"
+  - "A recommande la marque a des collegues, se sent trahi par ce probleme"

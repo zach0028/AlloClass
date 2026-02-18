@@ -1,0 +1,37 @@
+id: panne-livraison
+name: "Panne livraison"
+description: "Transporteur en panne, clients sans nouvelles depuis plusieurs jours"
+icon: truck
+strategy: blind
+difficulty_bias: hard
+
+persona_weights:
+  "Client fidele depuis 3 ans, ton direct mais poli": 0.10
+  "Nouveau client, premiere commande, un peu perdu": 0.05
+  "Client presse, ecrit depuis son telephone, style SMS": 0.15
+  "Client methodique, decrit les faits sans emotion": 0.05
+  "Client age, ton formel et detaille, un peu maladroit avec la technologie": 0.05
+  "Client passif-agressif, politesse froide, sous-entendus": 0.15
+  "Client en colere, majuscules, ponctuation excessive": 0.25
+  "Client decu mais comprehensif, ton triste plutot que vindicatif": 0.15
+  "Client professionnel (achat B2B), ton corporate et factuel": 0.03
+  "Client humoriste, dedramatise avec des blagues malgre le probleme": 0.02
+
+style_weights:
+  "formel et structure": 0.10
+  "familier et decontracte": 0.15
+  "style SMS, abreviations": 0.20
+  "poli mais ferme": 0.10
+  "agressif et impatient": 0.30
+  "detaille et methodique": 0.05
+  "laconique, phrases courtes": 0.10
+
+situation_overrides:
+  - "Colis non recu depuis 8 jours, aucune mise a jour du transporteur"
+  - "Le suivi indique 'en transit' depuis 5 jours sans mouvement"
+  - "Troisieme relance sans reponse, commande pour un anniversaire demain"
+  - "Le voisin a recu son colis mais pas moi, commande passee le meme jour"
+  - "Premiere commande sur le site, deja en retard, je regrette"
+  - "Besoin du colis pour un evenement professionnel lundi, toujours rien"
+  - "Le transporteur dit que c'est livre mais je n'ai rien recu"
+  - "Ca fait 2 semaines, je commence a penser que c'est une arnaque"

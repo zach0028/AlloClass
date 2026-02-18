@@ -1,0 +1,6 @@
+id: cas-limites
+name: "Cas limites"
+description: "Tickets deliberement ambigus qui testent les frontieres entre categories"
+icon: flask
+strategy: adversarial
+difficulty_bias: hard

@@ -1,0 +1,37 @@
+id: retours-soldes
+name: "Retours post-soldes"
+description: "Vague de demandes de remboursement et d'echange apres une periode de promotions"
+icon: tag
+strategy: blind
+difficulty_bias: balanced
+
+persona_weights:
+  "Client fidele depuis 3 ans, ton direct mais poli": 0.15
+  "Nouveau client, premiere commande, un peu perdu": 0.20
+  "Client presse, ecrit depuis son telephone, style SMS": 0.15
+  "Client methodique, decrit les faits sans emotion": 0.15
+  "Client age, ton formel et detaille, un peu maladroit avec la technologie": 0.05
+  "Client passif-agressif, politesse froide, sous-entendus": 0.05
+  "Client en colere, majuscules, ponctuation excessive": 0.05
+  "Client decu mais comprehensif, ton triste plutot que vindicatif": 0.10
+  "Client professionnel (achat B2B), ton corporate et factuel": 0.05
+  "Client humoriste, dedramatise avec des blagues malgre le probleme": 0.05
+
+style_weights:
+  "formel et structure": 0.15
+  "familier et decontracte": 0.25
+  "style SMS, abreviations": 0.15
+  "poli mais ferme": 0.20
+  "agressif et impatient": 0.05
+  "detaille et methodique": 0.10
+  "laconique, phrases courtes": 0.10
+
+situation_overrides:
+  - "Article achete en soldes, taille trop petite, veut echanger"
+  - "A commande 3 articles, en garde 1, veut retourner les 2 autres"
+  - "Le produit en promo ne correspond pas a la photo du site"
+  - "Veut un remboursement car le prix a encore baisse apres son achat"
+  - "Code promo expire avant qu'il ait pu finaliser sa commande"
+  - "Article solde marque non-retournable, mais defectueux"
+  - "A recu un bon de reduction au lieu d'un remboursement, pas content"
+  - "Commande passee en soldes livrée apres la fin des retours gratuits"

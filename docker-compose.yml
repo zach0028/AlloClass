@@ -6,7 +6,7 @@ services:
       POSTGRES_PASSWORD: alloclass
       POSTGRES_DB: alloclass
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -20,12 +20,15 @@ services:
     ports:
       - "8000:8000"
     env_file: .env
+    environment:
+      - PYTHONPATH=/app
     depends_on:
       db:
         condition: service_healthy
     volumes:
       - ./backend:/app
-    command: uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+      - backend_venv:/app/.venv
+    command: sh -c "uv sync --frozen && uv run alembic upgrade head && uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-exclude '.venv'"
 
   frontend:
     build: ./frontend
@@ -37,7 +40,10 @@ services:
       - backend
     volumes:
       - ./frontend:/app
-      - /app/node_modules
+      - frontend_node_modules:/app/node_modules
+    command: npm run dev -- -H 0.0.0.0
 
 volumes:
   pgdata:
+  backend_venv:
+  frontend_node_modules:
