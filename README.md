@@ -9,7 +9,7 @@ AlloClass est un moteur de classification de tickets clients par LLM, contenant 
 Prérequis : Docker & une clé API OpenAI
 
 ```bash
-git clone git@github.com:zach0028/AlloClass.git
+git clone https://github.com/zach0028/AlloClass.git
 cd AlloClass
 cp .env.exemple .env        # puis coller votre clé OPENAI_API_KEY
 docker compose up
