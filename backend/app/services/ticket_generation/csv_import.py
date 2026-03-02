@@ -5,9 +5,9 @@ from uuid import UUID
 from fastapi import UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.services.classification_pipeline import classify_ticket
-from app.services.config_management import get_config_with_relations
-from app.services.feedback_learning import store_feedback
+from app.services.classification.classification_pipeline import classify_ticket
+from app.services.config.config_management import get_config_with_relations
+from app.services.learning.feedback_learning import store_feedback
 
 TEXT_COLUMN_NAMES = {"text", "ticket", "message", "texte", "content", "description"}
 

@@ -22,6 +22,8 @@ export default function BackofficePage() {
     enabled: !!currentConfigId,
   });
 
+  const totalCount = (existing?.total ?? 0) + newTickets.length;
+
   const allTickets = useMemo(() => {
     const newIds = new Set(newTickets.map((t) => t.id));
     const fromDb: GeneratedTicketResponse[] = (existing?.items ?? [])
@@ -57,7 +59,7 @@ export default function BackofficePage() {
         </div>
 
         <div className="flex-1">
-          <DripFeedMonitor newTickets={allTickets} onTicketsDeleted={handleTicketsDeleted} />
+          <DripFeedMonitor newTickets={allTickets} totalCount={totalCount} onTicketsDeleted={handleTicketsDeleted} />
         </div>
       </div>
     </div>

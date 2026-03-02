@@ -8,11 +8,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.models.classification_result import ClassificationResult
 from app.models.config import Config
-from app.services.challenger_analysis import challenge_classification
-from app.services.learning_explainer import get_active_learned_rules
-from app.services.prompt_helpers import build_learned_rules_text
-from app.services.self_consistency_voting import run_self_consistency
-from app.services.vector_search import compute_embedding, search_similar_feedbacks
+from app.services.classification.challenger_analysis import challenge_classification
+from app.services.learning.learning_explainer import get_active_learned_rules
+from app.services.shared.prompt_helpers import build_learned_rules_text
+from app.services.classification.self_consistency_voting import run_self_consistency
+from app.services.shared.vector_search import compute_embedding, search_similar_feedbacks
 
 
 def _build_results_jsonb(vote_results: list[dict], config: Config) -> list[dict]:

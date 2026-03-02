@@ -2,9 +2,10 @@ import asyncio
 import random
 from uuid import UUID
 
-from app.core.config import settings
+from langchain_core.messages import HumanMessage, SystemMessage
+
 from app.core.database import async_session
-from app.core.openai_client import client as openai_client
+from app.core.llm import generator_llm
 from app.models.config import Config
 from app.prompts.blind_generator import (
     BLIND_GENERATOR_SYSTEM_PROMPT,
@@ -15,7 +16,7 @@ from app.prompts.blind_generator import (
     SITUATION_POOL_MEDIUM,
     STYLE_POOL,
 )
-from app.services.scenario_loader import build_combo_from_scenario, get_scenario
+from app.services.config.scenario_loader import build_combo_from_scenario, get_scenario
 
 DIFFICULTY_MIXES = {
     "easy": (0.7, 0.2, 0.1),
@@ -68,19 +69,11 @@ async def generate_blind_tickets(
 
 
 async def _generate_one(combo: dict) -> str:
-    response = await openai_client.chat.completions.create(
-        model=settings.generator_model,
-        messages=[
-            {"role": "system", "content": BLIND_GENERATOR_SYSTEM_PROMPT},
-            {
-                "role": "user",
-                "content": BLIND_GENERATOR_USER_PROMPT.format(**combo),
-            },
-        ],
-        temperature=1.0,
-        max_tokens=500,
-    )
-    return response.choices[0].message.content or ""
+    result = await generator_llm.ainvoke([
+        SystemMessage(content=BLIND_GENERATOR_SYSTEM_PROMPT),
+        HumanMessage(content=BLIND_GENERATOR_USER_PROMPT.format(**combo)),
+    ])
+    return result.content or ""
 
 
 class DripFeedManager:
@@ -112,8 +105,8 @@ class DripFeedManager:
         self._task = asyncio.create_task(self._run_loop())
 
     async def _run_loop(self):
-        from app.services.classification_pipeline import classify_ticket
-        from app.services.config_management import get_config_with_relations
+        from app.services.classification.classification_pipeline import classify_ticket
+        from app.services.config.config_management import get_config_with_relations
 
         try:
             while self.is_running and self.generated_count < self.total_count:

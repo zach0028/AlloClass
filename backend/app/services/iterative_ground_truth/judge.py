@@ -1,10 +1,12 @@
 import json
 
-from app.core.config import settings
-from app.core.openai_client import client as openai_client
+from langchain_core.messages import SystemMessage, HumanMessage
+
+from app.core.llm import evaluator_llm
+from app.schemas.llm_outputs import JudgeOutput
 from app.models.config import Config
 from app.prompts.ground_truth import JUDGE_SYSTEM, JUDGE_USER
-from app.services.prompt_helpers import build_axes_text
+from app.services.shared.prompt_helpers import build_axes_text
 
 
 async def evaluate_round(
@@ -39,43 +41,24 @@ async def evaluate_round(
         indent=2,
     )
 
-    response = await openai_client.chat.completions.create(
-        model=settings.evaluator_model,
-        messages=[
-            {
-                "role": "system",
-                "content": JUDGE_SYSTEM.format(
-                    axes_and_categories=axes_text,
-                    current_rules=rules_text,
-                ),
-            },
-            {
-                "role": "user",
-                "content": JUDGE_USER.format(
-                    round_number=round_number,
-                    avg_confidence=avg_confidence,
-                    target_confidence=target_confidence,
-                    above_threshold=above,
-                    total_tickets=len(round_results),
-                    results_json=results_json,
-                ),
-            },
-        ],
-        reasoning_effort="low",
-        response_format={"type": "json_object"},
-    )
-
-    content = response.choices[0].message.content
+    structured_llm = evaluator_llm.with_structured_output(JudgeOutput)
     try:
-        parsed = json.loads(content)
-        return {
-            "ticket_evaluations": parsed.get("ticket_evaluations", []),
-            "rules_to_add": parsed.get("rules_to_add", []),
-            "rules_to_remove": parsed.get("rules_to_remove", []),
-            "rules_to_modify": parsed.get("rules_to_modify", []),
-            "global_diagnosis": parsed.get("global_diagnosis", ""),
-        }
-    except (json.JSONDecodeError, TypeError):
+        result = await structured_llm.ainvoke([
+            SystemMessage(content=JUDGE_SYSTEM.format(
+                axes_and_categories=axes_text,
+                current_rules=rules_text,
+            )),
+            HumanMessage(content=JUDGE_USER.format(
+                round_number=round_number,
+                avg_confidence=avg_confidence,
+                target_confidence=target_confidence,
+                above_threshold=above,
+                total_tickets=len(round_results),
+                results_json=results_json,
+            )),
+        ])
+        return result.model_dump()
+    except Exception:
         return {
             "ticket_evaluations": [],
             "rules_to_add": [],

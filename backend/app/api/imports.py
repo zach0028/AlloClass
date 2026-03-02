@@ -15,7 +15,7 @@ async def import_csv(
     config_id: UUID,
     db: AsyncSession = Depends(get_db),
 ):
-    from app.services.csv_import import import_tickets_from_csv
+    from app.services.ticket_generation.csv_import import import_tickets_from_csv
 
     try:
         result = await import_tickets_from_csv(file, config_id, db)

@@ -7,11 +7,11 @@ from app.schemas.classification import (
     ClassifyBatchRequest,
     ClassifyRequest,
 )
-from app.services.classification_pipeline import (
+from app.services.classification.classification_pipeline import (
     classify_batch as svc_classify_batch,
     classify_ticket,
 )
-from app.services.config_management import get_config_with_relations
+from app.services.config.config_management import get_config_with_relations
 
 router = APIRouter(prefix="/api/classify", tags=["Classification"])
 

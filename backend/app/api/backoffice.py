@@ -14,7 +14,7 @@ from app.schemas.backoffice import (
     GeneratedTicketResponse,
     ScenarioResponse,
 )
-from app.services.scenario_loader import get_all_scenarios, get_scenario
+from app.services.config.scenario_loader import get_all_scenarios, get_scenario
 
 router = APIRouter(prefix="/api/backoffice", tags=["Backoffice"])
 
@@ -38,10 +38,10 @@ async def list_scenarios():
 async def generate_tickets(
     request: GenerateRequest, db: AsyncSession = Depends(get_db)
 ):
-    from app.services.blind_ticket_generator import generate_blind_tickets
-    from app.services.classification_pipeline import classify_batch
-    from app.services.config_management import get_config_with_relations
-    from app.services.exam_builder import generate_adversarial_cases
+    from app.services.ticket_generation.blind_ticket_generator import generate_blind_tickets
+    from app.services.classification.classification_pipeline import classify_batch
+    from app.services.config.config_management import get_config_with_relations
+    from app.services.ticket_generation.exam_builder import generate_adversarial_cases
 
     try:
         config = await get_config_with_relations(request.config_id, db)
@@ -104,7 +104,7 @@ async def delete_tickets_batch(
 
 @router.post("/drip-feed/start", response_model=DripFeedStatusResponse)
 async def start_drip_feed(request: DripFeedStartRequest):
-    from app.services.blind_ticket_generator import drip_feed_manager
+    from app.services.ticket_generation.blind_ticket_generator import drip_feed_manager
 
     scenario = get_scenario(request.scenario_id)
     if not scenario:
@@ -127,7 +127,7 @@ async def start_drip_feed(request: DripFeedStartRequest):
 
 @router.post("/drip-feed/stop", response_model=DripFeedStatusResponse)
 async def stop_drip_feed():
-    from app.services.blind_ticket_generator import drip_feed_manager
+    from app.services.ticket_generation.blind_ticket_generator import drip_feed_manager
 
     await drip_feed_manager.stop()
     return drip_feed_manager.get_status()
@@ -135,6 +135,6 @@ async def stop_drip_feed():
 
 @router.get("/status", response_model=DripFeedStatusResponse)
 async def get_drip_feed_status():
-    from app.services.blind_ticket_generator import drip_feed_manager
+    from app.services.ticket_generation.blind_ticket_generator import drip_feed_manager
 
     return drip_feed_manager.get_status()

@@ -18,7 +18,7 @@ router = APIRouter(prefix="/api/analytics", tags=["Analytics"])
 
 @router.get("/kpis", response_model=KPIResponse)
 async def get_kpis(config_id: UUID, db: AsyncSession = Depends(get_db)):
-    from app.services.analytics_computation import compute_kpis
+    from app.services.analytics.analytics_computation import compute_kpis
 
     result = await compute_kpis(config_id, db)
     return KPIResponse(**result)
@@ -28,7 +28,7 @@ async def get_kpis(config_id: UUID, db: AsyncSession = Depends(get_db)):
 async def get_confidence_distribution(
     config_id: UUID, db: AsyncSession = Depends(get_db)
 ):
-    from app.services.analytics_computation import compute_confidence_distribution
+    from app.services.analytics.analytics_computation import compute_confidence_distribution
 
     result = await compute_confidence_distribution(config_id, db)
     return ConfidenceResponse(
@@ -45,8 +45,8 @@ async def get_confidence_distribution(
 
 @router.get("/axes", response_model=list[AxisStatsResponse])
 async def get_axes_stats(config_id: UUID, db: AsyncSession = Depends(get_db)):
-    from app.services.analytics_computation import compute_axes_stats
-    from app.services.config_management import get_config_with_relations
+    from app.services.analytics.analytics_computation import compute_axes_stats
+    from app.services.config.config_management import get_config_with_relations
 
     config = await get_config_with_relations(config_id, db)
     name_to_id = {axis.name: axis.id for axis in config.axes}
@@ -78,7 +78,7 @@ async def get_axes_stats(config_id: UUID, db: AsyncSession = Depends(get_db)):
 
 @router.get("/embeddings", response_model=EmbeddingMapResponse)
 async def get_embedding_map(config_id: UUID, db: AsyncSession = Depends(get_db)):
-    from app.services.analytics_computation import compute_embedding_map
+    from app.services.analytics.analytics_computation import compute_embedding_map
 
     result = await compute_embedding_map(config_id, db)
     return EmbeddingMapResponse(points=result)
@@ -91,7 +91,7 @@ async def get_classification_matrix(
     y_axis: str | None = None,
     db: AsyncSession = Depends(get_db),
 ):
-    from app.services.analytics_computation import compute_classification_matrix
+    from app.services.analytics.analytics_computation import compute_classification_matrix
 
     result = await compute_classification_matrix(config_id, db, x_axis, y_axis)
     return ClassificationMatrixResponse(**result)

@@ -8,10 +8,11 @@ import { Clock, CheckCircle2, AlertTriangle, X, Trash2, Loader2, ChevronDown, Ch
 
 interface DripFeedMonitorProps {
   newTickets?: GeneratedTicketResponse[];
+  totalCount?: number;
   onTicketsDeleted?: (deletedIds: string[]) => void;
 }
 
-export function DripFeedMonitor({ newTickets = [], onTicketsDeleted }: DripFeedMonitorProps) {
+export function DripFeedMonitor({ newTickets = [], totalCount, onTicketsDeleted }: DripFeedMonitorProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
@@ -100,10 +101,10 @@ export function DripFeedMonitor({ newTickets = [], onTicketsDeleted }: DripFeedM
       <div className="flex items-center gap-2 border-b border-border p-4">
         <Clock className="h-5 w-5 text-primary" />
         <h2 className="text-lg font-semibold">Flux de generation</h2>
-        {allTickets.length > 0 && (
+        {newTickets.length > 0 && (
           <>
             <span className="ml-auto rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
-              {allTickets.length} tickets
+              {totalCount ?? newTickets.length} tickets
             </span>
             <button
               onClick={handleDeleteAll}
@@ -211,11 +212,6 @@ export function DripFeedMonitor({ newTickets = [], onTicketsDeleted }: DripFeedM
         )}
       </div>
 
-      {allTickets.length > 0 && (
-        <div className="border-t border-border bg-muted/30 px-4 py-2 text-center text-xs text-muted-foreground">
-          Affichage des {allTickets.length} derniers tickets
-        </div>
-      )}
     </div>
   );
 }

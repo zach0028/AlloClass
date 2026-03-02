@@ -7,8 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.models.user_feedback import UserFeedback
 from app.schemas.feedback import FeedbackCreate, FeedbackResponse, SuggestionResponse
-from app.services.error_pattern_detector import generate_suggestions
-from app.services.feedback_learning import store_feedback
+from app.services.learning.error_pattern_detector import generate_suggestions
+from app.services.learning.feedback_learning import store_feedback
 
 router = APIRouter(prefix="/api/feedbacks", tags=["Feedbacks"])
 

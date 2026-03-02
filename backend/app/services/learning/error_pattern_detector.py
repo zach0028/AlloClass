@@ -1,24 +1,24 @@
-import json
 from uuid import UUID
 
+from langchain_core.messages import HumanMessage
 from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
-from app.core.openai_client import client as openai_client
+from app.core.llm import challenger_llm
 from app.models.axis import Axis
 from app.models.axis_category import AxisCategory
 from app.models.classification_result import ClassificationResult
 from app.models.learned_rule import LearnedRule
 from app.models.user_feedback import UserFeedback
 from app.prompts.error_patterns import ERROR_PATTERN_PROMPT
-from app.services.prompt_helpers import build_axes_text
+from app.schemas.llm_outputs import ErrorPatternsOutput
+from app.services.shared.prompt_helpers import build_axes_text
 
 
 async def detect_error_patterns(
     config_id: UUID, db: AsyncSession
 ) -> list[dict]:
-    from app.services.config_management import get_config_with_relations
+    from app.services.config.config_management import get_config_with_relations
     config = await get_config_with_relations(config_id, db)
 
     query = (
@@ -57,29 +57,16 @@ async def detect_error_patterns(
 
     axes_text = build_axes_text(config)
 
-    response = await openai_client.chat.completions.create(
-        model=settings.challenger_model,
-        messages=[
-            {
-                "role": "user",
-                "content": ERROR_PATTERN_PROMPT.format(
-                    feedbacks_summary=feedbacks_summary,
-                    axes_and_categories=axes_text,
-                ),
-            }
-        ],
-        reasoning_effort="medium",
-        response_format={"type": "json_object"},
-    )
-
-    content = response.choices[0].message.content
+    structured_llm = challenger_llm.with_structured_output(ErrorPatternsOutput)
     try:
-        parsed = json.loads(content)
-        if isinstance(parsed, dict):
-            parsed = parsed.get("patterns", parsed.get("results", []))
-        if not isinstance(parsed, list):
-            parsed = []
-    except (json.JSONDecodeError, TypeError):
+        output = await structured_llm.ainvoke([
+            HumanMessage(content=ERROR_PATTERN_PROMPT.format(
+                feedbacks_summary=feedbacks_summary,
+                axes_and_categories=axes_text,
+            )),
+        ])
+        parsed = [p.model_dump() for p in output.patterns]
+    except Exception:
         parsed = []
 
     axis_map = {a.name: str(a.id) for a in config.axes}
@@ -200,7 +187,7 @@ async def generate_suggestions(
             "details": p,
         })
 
-    from app.services.config_management import get_config_with_relations
+    from app.services.config.config_management import get_config_with_relations
     config = await get_config_with_relations(config_id, db)
 
     for axis in config.axes:

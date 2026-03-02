@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.schemas.common import MessageResponse
 from app.schemas.config import ConfigCreate, ConfigResponse, TemplateResponse
-from app.services.config_management import (
+from app.services.config.config_management import (
     PRESETS_DIR,
     create_config as svc_create_config,
     delete_config as svc_delete_config,

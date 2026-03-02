@@ -4,7 +4,7 @@ from typing import Any
 
 import yaml
 
-SCENARIOS_DIR = Path(__file__).resolve().parent.parent / "presets" / "scenarios"
+SCENARIOS_DIR = Path(__file__).resolve().parent.parent.parent / "presets" / "scenarios"
 
 _cache: list[dict[str, Any]] | None = None
 

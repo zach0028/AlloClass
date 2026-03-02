@@ -8,7 +8,7 @@ from app.core.database import get_db
 from app.models.conversation import Conversation
 from app.schemas.chat import ChatRequest
 from app.services.agent import run_agent
-from app.services.config_management import get_config_with_relations
+from app.services.config.config_management import get_config_with_relations
 
 router = APIRouter(prefix="/api/chat", tags=["Chat"])
 

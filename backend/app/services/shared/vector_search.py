@@ -4,15 +4,11 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.openai_client import client as openai_client
+from app.core.llm import embeddings
 
 
 async def compute_embedding(text_input: str) -> list[float]:
-    response = await openai_client.embeddings.create(
-        model=settings.embedding_model,
-        input=text_input,
-    )
-    return response.data[0].embedding
+    return await embeddings.aembed_query(text_input)
 
 
 async def search_similar_feedbacks(

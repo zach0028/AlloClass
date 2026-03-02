@@ -22,7 +22,7 @@ from app.core.config import settings
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     from app.core.database import async_session
-    from app.services.config_management import ensure_default_config
+    from app.services.config.config_management import ensure_default_config
 
     async with async_session() as db:
         await ensure_default_config(db)

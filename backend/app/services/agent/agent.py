@@ -2,17 +2,17 @@ import json
 import uuid
 from collections.abc import AsyncGenerator
 
+from langchain_core.messages import AIMessage, HumanMessage
+from langgraph.prebuilt import create_react_agent
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
-from app.core.openai_client import client as openai_client
+from app.core.llm import agent_llm
 from app.models.chat_message import ChatMessage
 from app.models.config import Config
 
 from .history import load_conversation_history
 from .system_prompt import build_system_prompt
-from .tool_executor import execute_tool
-from .tools import AGENT_TOOLS
+from .tools_def import create_agent_tools
 
 TOOL_STEP_LABELS = {
     "classify_ticket": "Classification en cours...",
@@ -30,7 +30,7 @@ TOOL_STEP_LABELS = {
 
 def summarize_tool_result(tool_name: str, result: dict) -> str:
     if "error" in result:
-        return result["error"]
+        return f"Echec : {result['error']}"
 
     match tool_name:
         case "classify_ticket":
@@ -92,85 +92,49 @@ async def run_agent(
         config.id, db, limit=20, conversation_id=conversation_id
     )
 
-    messages = [
-        {"role": "system", "content": system_prompt},
-        *history,
-    ]
+    tools = create_agent_tools(config, db)
+    react_agent = create_react_agent(
+        model=agent_llm,
+        tools=tools,
+        prompt=system_prompt,
+    )
+
+    messages = []
+    for msg in history:
+        if msg["role"] == "user":
+            messages.append(HumanMessage(content=msg["content"]))
+        else:
+            messages.append(AIMessage(content=msg["content"]))
 
     final_text = ""
     tool_results_for_frontend: list[dict] = []
     learning_card_data: dict | None = None
+    has_emitted_deltas = False
+    tool_depth = 0
 
     try:
-        for _ in range(MAX_TOOL_ITERATIONS):
-            stream = await openai_client.chat.completions.create(
-                model=settings.agent_model,
-                messages=messages,
-                tools=AGENT_TOOLS,
-                reasoning_effort="medium",
-                stream=True,
-            )
+        async for event in react_agent.astream_events(
+            {"messages": messages},
+            version="v2",
+            config={"recursion_limit": MAX_TOOL_ITERATIONS * 2 + 1},
+        ):
+            kind = event["event"]
 
-            content_parts: list[str] = []
-            tool_calls_acc: dict[int, dict] = {}
+            if kind == "on_chat_model_stream":
+                chunk = event["data"]["chunk"]
+                if chunk.content and not chunk.tool_call_chunks and tool_depth == 0:
+                    has_emitted_deltas = True
+                    final_text += chunk.content
+                    yield {"type": "delta", "data": {"content": chunk.content}}
 
-            async for chunk in stream:
-                choice = chunk.choices[0]
-                delta = choice.delta
+            elif kind == "on_tool_start":
+                tool_depth += 1
+                tool_name = event["name"]
 
-                if delta.content:
-                    content_parts.append(delta.content)
-                    yield {"type": "delta", "data": {"content": delta.content}}
-
-                if delta.tool_calls:
-                    for tc_delta in delta.tool_calls:
-                        idx = tc_delta.index
-                        if idx not in tool_calls_acc:
-                            tool_calls_acc[idx] = {
-                                "id": "",
-                                "name": "",
-                                "arguments": "",
-                            }
-                        if tc_delta.id:
-                            tool_calls_acc[idx]["id"] = tc_delta.id
-                        if tc_delta.function:
-                            if tc_delta.function.name:
-                                tool_calls_acc[idx]["name"] = tc_delta.function.name
-                            if tc_delta.function.arguments:
-                                tool_calls_acc[idx]["arguments"] += tc_delta.function.arguments
-
-            content_text = "".join(content_parts)
-
-            if not tool_calls_acc:
-                final_text = content_text
-                yield {"type": "done", "data": {}}
-                break
-
-            if content_text:
-                yield {
-                    "type": "thinking",
-                    "data": {"message": content_text},
-                }
-
-            messages.append({
-                "role": "assistant",
-                "content": content_text or None,
-                "tool_calls": [
-                    {
-                        "id": tc["id"],
-                        "type": "function",
-                        "function": {
-                            "name": tc["name"],
-                            "arguments": tc["arguments"],
-                        },
-                    }
-                    for _, tc in sorted(tool_calls_acc.items())
-                ],
-            })
-
-            for tc_data in (tool_calls_acc[i] for i in sorted(tool_calls_acc)):
-                tool_name = tc_data["name"]
-                tool_args = json.loads(tc_data["arguments"])
+                if has_emitted_deltas:
+                    yield {"type": "thinking", "data": {"message": final_text}}
+                    final_text = ""
+                    has_emitted_deltas = False
 
                 yield {
                     "type": "step",
@@ -183,11 +147,26 @@ async def run_agent(
                     },
                 }
 
-                try:
-                    result = await execute_tool(tool_name, tool_args, config, db)
-                except Exception as tool_exc:
-                    await db.rollback()
-                    result = {"error": f"Echec de {tool_name}: {tool_exc}"}
+            elif kind == "on_tool_end":
+                tool_depth -= 1
+                tool_name = event["name"]
+                raw_output = event["data"]["output"]
+
+                if hasattr(raw_output, "content"):
+                    raw_output = raw_output.content
+
+                if isinstance(raw_output, dict):
+                    result = raw_output
+                elif isinstance(raw_output, str):
+                    try:
+                        result = json.loads(raw_output)
+                    except (json.JSONDecodeError, TypeError):
+                        result = {"raw": raw_output}
+                else:
+                    result = {"raw": str(raw_output)}
+
+                if not isinstance(result, dict):
+                    result = {"raw": str(result)}
 
                 yield {
                     "type": "step_result",
@@ -206,10 +185,7 @@ async def run_agent(
 
                 if tool_name == "correct_classification" and "learning_card" in result:
                     learning_card_data = result["learning_card"]
-                    yield {
-                        "type": "learning",
-                        "data": learning_card_data,
-                    }
+                    yield {"type": "learning", "data": learning_card_data}
 
                 if tool_name == "classify_batch" and "results" in result:
                     for item in result["results"]:
@@ -219,11 +195,7 @@ async def run_agent(
                         }
                         tool_results_for_frontend.append(item)
 
-                messages.append({
-                    "role": "tool",
-                    "tool_call_id": tc_data["id"],
-                    "content": json.dumps(result, ensure_ascii=False, default=str),
-                })
+        yield {"type": "done", "data": {}}
 
     except Exception as exc:
         final_text = f"Erreur : {exc}"
@@ -249,6 +221,7 @@ async def run_agent(
 
         if conversation_id:
             from datetime import datetime, timezone
+
             from app.models.conversation import Conversation
 
             conv = await db.get(Conversation, conversation_id)

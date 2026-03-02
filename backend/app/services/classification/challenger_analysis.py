@@ -1,10 +1,12 @@
 import json
 
-from app.core.config import settings
-from app.core.openai_client import client as openai_client
+from langchain_core.messages import HumanMessage, SystemMessage
+
+from app.core.llm import challenger_llm
 from app.models.config import Config
 from app.prompts.challenger import CHALLENGER_SYSTEM_PROMPT, CHALLENGER_USER_PROMPT
-from app.services.prompt_helpers import build_axes_text
+from app.schemas.llm_outputs import ChallengerOutput
+from app.services.shared.prompt_helpers import build_axes_text
 
 
 async def challenge_classification(
@@ -34,36 +36,25 @@ async def challenge_classification(
         initial_results=weak_axes_summary,
     )
 
-    response = await openai_client.chat.completions.create(
-        model=settings.challenger_model,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
-        reasoning_effort="medium",
-        response_format={"type": "json_object"},
-    )
-
-    content = response.choices[0].message.content
-    tokens = response.usage.total_tokens if response.usage else 0
-
-    try:
-        parsed = json.loads(content)
-    except (json.JSONDecodeError, TypeError):
-        parsed = {"challenges": []}
+    structured_llm = challenger_llm.with_structured_output(ChallengerOutput)
+    output = await structured_llm.ainvoke([
+        SystemMessage(content=system_prompt),
+        HumanMessage(content=user_prompt),
+    ])
+    tokens = 0
 
     challenges = []
-    for ch in parsed.get("challenges", []):
+    for ch in output.challenges:
         matching_weak = next(
-            (wa for wa in weak_axes if wa["axis_name"] == ch.get("axis_name")),
+            (wa for wa in weak_axes if wa["axis_name"] == ch.axis_name),
             None,
         )
         challenges.append({
             "axis_id": matching_weak["axis_id"] if matching_weak else None,
-            "axis_name": ch.get("axis_name", ""),
-            "alternative_category": ch.get("alternative_category", ""),
-            "argument": ch.get("argument", ""),
-            "agrees_with_original": ch.get("agrees_with_original", True),
+            "axis_name": ch.axis_name,
+            "alternative_category": ch.alternative_category,
+            "argument": ch.argument,
+            "agrees_with_original": ch.agrees_with_original,
             "original_confidence": matching_weak["empirical_confidence"] if matching_weak else 0,
         })
 

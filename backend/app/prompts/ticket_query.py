@@ -16,7 +16,7 @@ FILTRES SUPPORTES :
 Retourne un JSON strict :
 {{
     "filters": {{
-        "axes": {{"Type": ["Reclamation"], "Urgence": ["Haute", "Critique"]}},
+        "axes": [{{"axis_name": "Type", "categories": ["Reclamation"]}}, {{"axis_name": "Urgence", "categories": ["Haute", "Critique"]}}],
         "date_range": "last_week",
         "confidence_min": null,
         "confidence_max": null,

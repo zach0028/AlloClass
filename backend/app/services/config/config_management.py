@@ -10,7 +10,7 @@ from app.models.axis import Axis
 from app.models.axis_category import AxisCategory
 from app.models.config import Config
 
-PRESETS_DIR = Path(__file__).resolve().parent.parent / "presets"
+PRESETS_DIR = Path(__file__).resolve().parent.parent.parent / "presets"
 
 
 async def ensure_default_config(db: AsyncSession) -> Config:

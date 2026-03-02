@@ -1,15 +1,15 @@
-import json
 from collections import Counter
 from uuid import UUID
 
+from langchain_core.messages import HumanMessage, SystemMessage
 from sqlalchemy import text as sa_text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
-from app.core.openai_client import client as openai_client
+from app.core.llm import classifier_llm
 from app.models.config import Config
 from app.prompts.classifier import CLASSIFIER_SYSTEM_PROMPT, CLASSIFIER_USER_PROMPT
-from app.services.prompt_helpers import build_axes_text, build_few_shot_text
+from app.schemas.llm_outputs import ClassifierOutput
+from app.services.shared.prompt_helpers import build_axes_text, build_few_shot_text
 
 
 async def _single_classification(
@@ -30,25 +30,14 @@ async def _single_classification(
         ticket_text=ticket_text,
     )
 
-    response = await openai_client.chat.completions.create(
-        model=settings.classifier_model,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
-        reasoning_effort="low",
-        response_format={"type": "json_object"},
-    )
+    structured_llm = classifier_llm.with_structured_output(ClassifierOutput)
+    result = await structured_llm.ainvoke([
+        SystemMessage(content=system_prompt),
+        HumanMessage(content=user_prompt),
+    ])
 
-    content = response.choices[0].message.content
-    tokens = response.usage.total_tokens if response.usage else 0
-
-    try:
-        parsed = json.loads(content)
-    except (json.JSONDecodeError, TypeError) as e:
-        parsed = {"results": [], "_parse_error": str(e)}
-
-    return {"parsed": parsed, "tokens": tokens}
+    parsed = {"results": [r.model_dump() for r in result.results]}
+    return {"parsed": parsed, "tokens": 0}
 
 
 async def run_self_consistency(
@@ -123,7 +112,7 @@ async def compute_axis_disagreement(
     if not rows:
         return []
 
-    from app.services.config_management import get_config_with_relations
+    from app.services.config.config_management import get_config_with_relations
     config = await get_config_with_relations(config_id, db)
 
     axis_stats: dict[str, dict] = {}

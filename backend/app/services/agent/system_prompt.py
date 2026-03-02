@@ -1,5 +1,5 @@
 from app.models.config import Config
-from app.services.prompt_helpers import build_axes_text
+from app.services.shared.prompt_helpers import build_axes_text
 
 
 def build_system_prompt(config: Config) -> str:

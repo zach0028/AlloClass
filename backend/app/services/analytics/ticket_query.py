@@ -6,65 +6,56 @@ from sqlalchemy import select, func, or_, text, cast
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
-from app.core.openai_client import client as openai_client
+from langchain_core.messages import HumanMessage
+
+from app.core.llm import classifier_llm
 from app.models.classification_result import ClassificationResult
 from app.models.user_feedback import UserFeedback
 from app.prompts.ticket_query import TICKET_QUERY_PROMPT, TICKET_QUERY_SEMANTIC_PROMPT
-from app.services.prompt_helpers import build_axes_text
-from app.services.vector_search import compute_embedding
+from app.schemas.llm_outputs import TicketQueryOutput, SemanticQueryOutput
+from app.services.shared.prompt_helpers import build_axes_text
+from app.services.shared.vector_search import compute_embedding
 
 
 async def query_tickets_natural_language(
     message: str, config_id: UUID, db: AsyncSession
 ) -> dict:
-    from app.services.config_management import get_config_with_relations
+    from app.services.config.config_management import get_config_with_relations
 
     config = await get_config_with_relations(config_id, db)
     axes_text = build_axes_text(config)
 
-    response = await openai_client.chat.completions.create(
-        model=settings.classifier_model,
-        messages=[
-            {
-                "role": "user",
-                "content": TICKET_QUERY_PROMPT.format(
-                    axes_and_categories=axes_text,
-                    message=message,
-                ),
-            }
-        ],
-        reasoning_effort="low",
-        response_format={"type": "json_object"},
-    )
-
-    content = response.choices[0].message.content
+    structured_llm = classifier_llm.with_structured_output(TicketQueryOutput)
     try:
-        parsed = json.loads(content)
-    except (json.JSONDecodeError, TypeError):
+        parsed = await structured_llm.ainvoke([
+            HumanMessage(content=TICKET_QUERY_PROMPT.format(
+                axes_and_categories=axes_text, message=message,
+            )),
+        ])
+    except Exception:
         return {
             "interpretation": "Impossible de comprendre la requete.",
             "total_count": 0,
             "results": [],
         }
 
-    filters = parsed.get("filters", {})
-    sort_by = parsed.get("sort", "created_at_desc")
-    limit = min(parsed.get("limit", 20), 100)
-    aggregation = parsed.get("aggregation")
+    filters = parsed.filters
+    sort_by = parsed.sort
+    limit = min(parsed.limit, 100)
+    aggregation = parsed.aggregation
 
     query = select(ClassificationResult).where(
         ClassificationResult.config_id == config_id
     )
 
-    query = _apply_date_filter(query, filters.get("date_range"))
+    query = _apply_date_filter(query, filters.date_range)
     query = _apply_confidence_filters(
-        query, filters.get("confidence_min"), filters.get("confidence_max")
+        query, filters.confidence_min, filters.confidence_max
     )
-    query = _apply_challenged_filter(query, filters.get("was_challenged"))
-    query = _apply_feedback_filter(query, filters.get("has_feedback"))
-    query = _apply_text_search(query, filters.get("text_search"))
-    query = _apply_axes_filters(query, filters.get("axes", {}))
+    query = _apply_challenged_filter(query, filters.was_challenged)
+    query = _apply_feedback_filter(query, filters.has_feedback)
+    query = _apply_text_search(query, filters.text_search)
+    query = _apply_axes_filters(query, filters.axes)
 
     if aggregation == "count":
         count_q = select(func.count()).select_from(query.subquery())
@@ -92,26 +83,16 @@ async def query_tickets_natural_language(
 async def query_tickets_semantic(
     message: str, config_id: UUID, db: AsyncSession, limit: int = 20
 ) -> dict:
-    response = await openai_client.chat.completions.create(
-        model=settings.classifier_model,
-        messages=[
-            {
-                "role": "user",
-                "content": TICKET_QUERY_SEMANTIC_PROMPT.format(message=message),
-            }
-        ],
-        reasoning_effort="low",
-        response_format={"type": "json_object"},
-    )
-
-    content = response.choices[0].message.content
+    structured_llm = classifier_llm.with_structured_output(SemanticQueryOutput)
     try:
-        parsed = json.loads(content)
-    except (json.JSONDecodeError, TypeError):
-        parsed = {"search_text": message, "limit": limit}
-
-    search_text = parsed.get("search_text", message)
-    result_limit = min(parsed.get("limit", limit), 100)
+        output = await structured_llm.ainvoke([
+            HumanMessage(content=TICKET_QUERY_SEMANTIC_PROMPT.format(message=message)),
+        ])
+        search_text = output.search_text
+        result_limit = min(output.limit, 100)
+    except Exception:
+        search_text = message
+        result_limit = min(limit, 100)
 
     embedding = await compute_embedding(search_text)
 
@@ -213,7 +194,9 @@ def _apply_text_search(query, text_search):
 
 
 def _apply_axes_filters(query, axes_filters):
-    for axis_name, categories in axes_filters.items():
+    for axis_filter in axes_filters:
+        axis_name = axis_filter.axis_name if hasattr(axis_filter, "axis_name") else axis_filter.get("axis_name", "")
+        categories = axis_filter.categories if hasattr(axis_filter, "categories") else axis_filter.get("categories", [])
         if not categories:
             continue
         cat_conditions = []
@@ -255,14 +238,15 @@ def _simplify_results(results: list[dict] | None) -> dict:
     return {r["axis_name"]: r["category_name"] for r in results if "axis_name" in r}
 
 
-def _build_interpretation(filters: dict, count: int) -> str:
+def _build_interpretation(filters, count: int) -> str:
     parts = []
-    axes = filters.get("axes", {})
-    for axis_name, cats in axes.items():
+    for axis_filter in filters.axes:
+        name = axis_filter.axis_name if hasattr(axis_filter, "axis_name") else axis_filter.get("axis_name", "")
+        cats = axis_filter.categories if hasattr(axis_filter, "categories") else axis_filter.get("categories", [])
         if cats:
-            parts.append(f"{axis_name} = {', '.join(cats)}")
+            parts.append(f"{name} = {', '.join(cats)}")
 
-    date_range = filters.get("date_range")
+    date_range = filters.date_range if hasattr(filters, "date_range") else filters.get("date_range")
     if date_range and date_range != "all":
         date_labels = {
             "today": "aujourd'hui",
@@ -271,7 +255,7 @@ def _build_interpretation(filters: dict, count: int) -> str:
         }
         parts.append(date_labels.get(date_range, date_range))
 
-    conf_min = filters.get("confidence_min")
+    conf_min = filters.confidence_min if hasattr(filters, "confidence_min") else filters.get("confidence_min")
     if conf_min is not None:
         parts.append(f"confiance >= {int(conf_min * 100)}%")
 

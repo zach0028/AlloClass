@@ -4,14 +4,16 @@ from uuid import UUID
 from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
-from app.core.openai_client import client as openai_client
+from langchain_core.messages import SystemMessage, HumanMessage
+
+from app.core.llm import classifier_llm
 from app.models.axis import Axis
 from app.models.axis_category import AxisCategory
 from app.models.classification_result import ClassificationResult
 from app.models.user_feedback import UserFeedback
 from app.prompts.feedback_parser import FEEDBACK_PARSER_SYSTEM_PROMPT
-from app.services.prompt_helpers import build_axes_text
+from app.schemas.llm_outputs import FeedbackParserOutput
+from app.services.shared.prompt_helpers import build_axes_text
 
 
 async def store_feedback(
@@ -74,7 +76,7 @@ async def process_natural_feedback(
     if classification is None:
         return {"success": False, "message": "Aucune classification recente trouvee."}
 
-    from app.services.config_management import get_config_with_relations
+    from app.services.config.config_management import get_config_with_relations
     config = await get_config_with_relations(config_id, db)
     axes_text = build_axes_text(config)
 
@@ -85,24 +87,17 @@ async def process_natural_feedback(
         current_results=current_results,
     )
 
-    response = await openai_client.chat.completions.create(
-        model=settings.classifier_model,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": message},
-        ],
-        reasoning_effort="low",
-        response_format={"type": "json_object"},
-    )
-
-    content = response.choices[0].message.content
+    structured_llm = classifier_llm.with_structured_output(FeedbackParserOutput)
     try:
-        parsed = json.loads(content)
-    except (json.JSONDecodeError, TypeError):
+        parsed = await structured_llm.ainvoke([
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=message),
+        ])
+    except Exception:
         return {"success": False, "message": "Impossible de comprendre le feedback."}
 
-    axis_name = parsed.get("axis_name", "")
-    corrected_cat_name = parsed.get("corrected_category", "")
+    axis_name = parsed.axis_name
+    corrected_cat_name = parsed.corrected_category
 
     target_axis = next((a for a in config.axes if a.name == axis_name), None)
     if target_axis is None:
@@ -121,12 +116,12 @@ async def process_natural_feedback(
         classification_id=classification.id,
         axis_id=target_axis.id,
         corrected_category_id=target_cat.id,
-        reasoning_feedback=parsed.get("reasoning"),
+        reasoning_feedback=parsed.reasoning,
         feedback_type="corrected",
         db=db,
     )
 
-    from app.services.learning_explainer import explain_learning
+    from app.services.learning.learning_explainer import explain_learning
     learning_card = await explain_learning(feedback.id, db)
 
     return {

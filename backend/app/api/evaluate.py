@@ -22,7 +22,7 @@ class GroundTruthRequest(BaseModel):
 async def run_ground_truth(
     request: GroundTruthRequest, db: AsyncSession = Depends(get_db)
 ):
-    from app.services.config_management import get_config_with_relations
+    from app.services.config.config_management import get_config_with_relations
     from app.services.iterative_ground_truth import run_ground_truth_loop
 
     try:

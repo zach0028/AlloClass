@@ -7,7 +7,7 @@ from app.models.axis import Axis
 from app.models.config import Config
 from app.models.learned_rule import LearnedRule
 from app.models.prompt_version import PromptVersion
-from app.services.prompt_helpers import build_axes_text
+from app.services.shared.prompt_helpers import build_axes_text
 
 
 async def create_version(
